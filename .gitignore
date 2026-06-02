@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+venv/
+env/
+ENV/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Flask / database
+instance/
+*.db
+*.sqlite3
+
+# IDEs and editors
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Dashboard Grid -->
+<div class="dashboard">
+
+  <!-- ═══ LEFT PANEL ═══ -->
+  <aside class="panel-left">
+
+    <!-- Add / Edit Form Card -->
+    <div class="card card-form" id="form-card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <i class="bi bi-plus-circle card-icon"></i>
+          <h2 class="card-title" id="form-title">Add Expense</h2>
+        </div>
+        <button class="btn-ghost hidden" id="cancel-edit-btn" onclick="cancelEdit()">
+          <i class="bi bi-x-lg"></i> Cancel
+        </button>
+      </div>
+      <div class="card-body">
+        <form id="expense-form" novalidate>
+          <input type="hidden" id="edit-id" value="" />
+
+          <div class="form-group">
+            <label class="form-label" for="title">
+              Title <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i class="bi bi-tag input-icon"></i>
+              <input type="text" id="title" class="form-input" placeholder="e.g. Coffee at Starbucks" maxlength="50" />
+              <div class="char-count" id="title-count">0 / 50</div>
+            </div>
+            <div class="field-error" id="title-err"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="amount">
+              Amount (₹) <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i class="bi bi-currency-rupee input-icon"></i>
+              <input type="number" id="amount" class="form-input" placeholder="0.00" min="0.01" step="0.01" />
+            </div>
+            <div class="field-error" id="amount-err"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="category">
+              Category <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i class="bi bi-grid input-icon"></i>
+              <select id="category" class="form-input form-select-custom">
+                <option value="">-- Select category --</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field-error" id="category-err"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="date">
+              Date <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i class="bi bi-calendar3 input-icon"></i>
+              <input type="date" id="date" class="form-input" />
+            </div>
+            <div class="field-error" id="date-err"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="note">Note <span class="optional">(optional)</span></label>
+            <div class="input-wrapper textarea-wrapper">
+              <i class="bi bi-chat-text input-icon"></i>
+              <textarea id="note" class="form-input form-textarea" rows="2" placeholder="Add a note..."></textarea>
+            </div>
+          </div>
+
+          <div id="form-errors" class="form-errors hidden"></div>
+
+          <button type="submit" class="btn-primary-full" id="submit-btn">
+            <i class="bi bi-plus-lg" id="submit-icon"></i>
+            <span id="submit-label">Add Expense</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <section class="panel-main">
+
+    <!-- Filters Bar -->
+    <div class="card card-filters" id="filter-card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <i class="bi bi-funnel card-icon"></i>
+          <h2 class="card-title">Filters</h2>
+        </div>
+        <button class="btn-ghost" onclick="toggleFilters()" id="toggle-filters-btn">
+          <i class="bi bi-chevron-down" id="filter-chevron"></i>
+        </button>
+      </div>
+      <div class="card-body filter-body" id="filter-body">
+        <div class="filter-grid">
+          <div class="filter-item">
+            <label class="form-label-sm" for="filter-category">Category</label>
+            <select id="filter-category" class="form-input-sm">
+              <option value="">All Categories</option>
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="filter-item">
+            <label class="form-label-sm" for="filter-from">From</label>
+            <input type="date" id="filter-from" class="form-input-sm" />
+          </div>
+          <div class="filter-item">
+            <label class="form-label-sm" for="filter-to">To</label>
+            <input type="date" id="filter-to" class="form-input-sm" />
+          </div>
+          <div class="filter-item">
+            <label class="form-label-sm" for="filter-search">Search title</label>
+            <div class="input-wrapper-sm">
+              <i class="bi bi-search input-icon-sm"></i>
+              <input type="text" id="filter-search" class="form-input-sm has-icon" placeholder="e.g. coffee" />
+            </div>
+          </div>
+          <div class="filter-actions">
+            <button class="btn-filter-apply" onclick="applyFilters()" id="apply-filters-btn">
+              <i class="bi bi-check2"></i> Apply
+            </button>
+            <button class="btn-filter-clear" onclick="clearFilters()" id="clear-filters-btn">
+              <i class="bi bi-arrow-counterclockwise"></i> Clear
+            </button>
+          </div>
+        </div>
+        <div id="filter-error" class="filter-error hidden"></div>
+      </div>
+    </div>
+
+    <!-- Expenses List -->
+    <div class="card card-expenses">
+      <div class="card-header">
+        <div class="card-header-left">
+          <i class="bi bi-receipt card-icon"></i>
+          <h2 class="card-title">Expenses</h2>
+          <span class="badge" id="expense-count">0</span>
+        </div>
+        <button class="btn-ghost" onclick="seedDemoData()" id="seed-demo-btn" title="Add sample data in multiple months for testing">
+          <i class="bi bi-database-add"></i> Seed Demo Data
+        </button>
+      </div>
+      <div class="card-body card-body-table">
+        <div class="table-responsive">
+          <table class="expense-table" id="expense-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Date</th>
+                <th>Note</th>
+                <th class="th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="expenses-tbody">
+              <tr>
+                <td colspan="6" class="empty-state">
+                  <div class="skeleton-loader">
+                    <div class="skeleton-line wide"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line short"></div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary & Chart Cards side-by-side -->
+    <div class="summary-chart-row">
+      <!-- Monthly Summary Card -->
+      <div class="card card-summary">
+        <div class="card-header">
+          <div class="card-header-left">
+            <i class="bi bi-bar-chart-line card-icon"></i>
+            <h2 class="card-title">Monthly Summary</h2>
+          </div>
+          <div class="month-nav">
+            <button class="btn-icon" id="prev-month-btn" onclick="changeMonth(-1)" title="Previous month">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <span class="month-label" id="month-label">June 2026</span>
+            <button class="btn-icon" id="next-month-btn" onclick="changeMonth(1)" title="Next month">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body" id="summary-body">
+          <div class="skeleton-loader">
+            <div class="skeleton-line wide"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spending Chart Card -->
+      <div class="card card-chart">
+        <div class="card-header">
+          <div class="card-header-left">
+            <i class="bi bi-pie-chart card-icon"></i>
+            <h2 class="card-title">Spending Breakdown</h2>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-container" id="chart-container">
+            <canvas id="spending-chart"></canvas>
+          </div>
+          <div class="chart-empty hidden" id="chart-empty">
+            <i class="bi bi-pie-chart" style="font-size: 1.5rem; opacity: 0.3;"></i>
+            <p>No data to display</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay hidden" id="delete-modal-overlay">
+  <div class="modal-box" id="delete-modal">
+    <div class="modal-icon-wrap">
+      <i class="bi bi-exclamation-triangle"></i>
+    </div>
+    <h3 class="modal-title">Delete Expense?</h3>
+    <p class="modal-desc" id="delete-modal-desc">This action cannot be undone. The expense will be permanently removed.</p>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="cancel-delete-btn" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn-modal-delete" id="confirm-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
