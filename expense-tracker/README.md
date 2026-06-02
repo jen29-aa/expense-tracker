@@ -139,6 +139,7 @@ Filter params for GET `/api/expenses`: `category`, `from_date`, `to_date`, `sear
 | Edge Case | How It's Handled |
 |-----------|-----------------|
 | from_date > to_date | Inline error, query not sent |
+| Manually typed invalid date (e.g. June 31st) | Checked via HTML5 ValidityState; inline warning shown and query blocked to prevent partial bounds mismatch |
 | Search with SQL wildcards (`%`, `_`) | Escaped server-side to prevent unintended matches |
 | No results from filter vs no data at all | Different empty state messages ("No expenses match your filters" vs "No expenses yet") |
 | Invalid date format in URL params | 400 error with specific message |
