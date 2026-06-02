@@ -98,140 +98,278 @@
   <!-- ═══ MAIN CONTENT ═══ -->
   <section class="panel-main">
 
-    <!-- Filters Bar -->
-    <div class="card card-filters" id="filter-card">
-      <div class="card-header">
-        <div class="card-header-left">
-          <i class="bi bi-funnel card-icon"></i>
-          <h2 class="card-title">Filters</h2>
+    <!-- Dashboard Tab Bar -->
+    <nav class="dashboard-tabs">
+      <button class="tab-btn active" id="btn-tab-dashboard" onclick="switchTab('dashboard')">
+        <i class="bi bi-grid-1x2-fill"></i> Dashboard
+      </button>
+      <button class="tab-btn" id="btn-tab-overview" onclick="switchTab('overview')">
+        <i class="bi bi-wallet2"></i> Transactions
+      </button>
+      <button class="tab-btn" id="btn-tab-analytics" onclick="switchTab('analytics')">
+        <i class="bi bi-bar-chart-line"></i> Trends
+      </button>
+      <button class="tab-btn" id="btn-tab-budgets" onclick="switchTab('budgets')">
+        <i class="bi bi-bullseye"></i> Budgets
+      </button>
+    </nav>
+
+    <!-- ─── TAB 0: DASHBOARD (Overview) ─── -->
+    <div id="tab-dashboard" class="tab-content">
+      <!-- Dashboard Header with Month Nav -->
+      <div class="dashboard-tab-header">
+        <h2 class="dashboard-tab-title">Financial Summary</h2>
+        <div class="month-nav" id="dash-month-nav">
+          <button class="btn-icon" onclick="changeMonth(-1)" title="Previous month">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <span class="month-label" id="dash-month-label-header">June 2026</span>
+          <button class="btn-icon" onclick="changeMonth(1)" title="Next month">
+            <i class="bi bi-chevron-right"></i>
+          </button>
         </div>
-        <button class="btn-ghost" onclick="toggleFilters()" id="toggle-filters-btn">
-          <i class="bi bi-chevron-down" id="filter-chevron"></i>
-        </button>
       </div>
-      <div class="card-body filter-body" id="filter-body">
-        <div class="filter-grid">
-          <div class="filter-item">
-            <label class="form-label-sm" for="filter-category">Category</label>
-            <select id="filter-category" class="form-input-sm">
-              <option value="">All Categories</option>
-              {% for cat in categories %}
-              <option value="{{ cat }}">{{ cat }}</option>
-              {% endfor %}
-            </select>
+
+      <!-- Top Metrics Grid -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon-wrap bg-primary-subtle">
+            <i class="bi bi-currency-rupee text-primary"></i>
           </div>
-          <div class="filter-item">
-            <label class="form-label-sm" for="filter-from">From</label>
-            <input type="date" id="filter-from" class="form-input-sm" />
+          <div class="metric-details">
+            <span class="metric-label">This Month's Spending</span>
+            <h3 class="metric-value" id="dash-month-total">₹0.00</h3>
+            <span class="metric-subtext" id="dash-month-label">June 2026</span>
           </div>
-          <div class="filter-item">
-            <label class="form-label-sm" for="filter-to">To</label>
-            <input type="date" id="filter-to" class="form-input-sm" />
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon-wrap bg-success-subtle" id="dash-budget-status-icon-wrap">
+            <i class="bi bi-shield-check text-success"></i>
           </div>
-          <div class="filter-item">
-            <label class="form-label-sm" for="filter-search">Search title</label>
-            <div class="input-wrapper-sm">
-              <i class="bi bi-search input-icon-sm"></i>
-              <input type="text" id="filter-search" class="form-input-sm has-icon" placeholder="e.g. coffee" />
+          <div class="metric-details">
+            <span class="metric-label">Budget Status</span>
+            <h3 class="metric-value text-success" id="dash-budget-status">On Track</h3>
+            <span class="metric-subtext" id="dash-budget-subtext">All categories within limit</span>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon-wrap bg-warning-subtle">
+            <i class="bi bi-fire text-warning"></i>
+          </div>
+          <div class="metric-details">
+            <span class="metric-label">Top Category</span>
+            <h3 class="metric-value" id="dash-top-category">None</h3>
+            <span class="metric-subtext" id="dash-top-category-amount">₹0.00 spent</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Charts & Feed Grid -->
+      <div class="dashboard-grid-layout">
+        <!-- Breakdown Chart Card -->
+        <div class="card card-dashboard-chart">
+          <div class="card-header">
+            <div class="card-header-left">
+              <i class="bi bi-pie-chart card-icon"></i>
+              <h2 class="card-title">Spending Breakdown</h2>
             </div>
           </div>
-          <div class="filter-actions">
-            <button class="btn-filter-apply" onclick="applyFilters()" id="apply-filters-btn">
-              <i class="bi bi-check2"></i> Apply
-            </button>
-            <button class="btn-filter-clear" onclick="clearFilters()" id="clear-filters-btn">
-              <i class="bi bi-arrow-counterclockwise"></i> Clear
-            </button>
+          <div class="card-body">
+            <div class="chart-container" id="chart-container">
+              <canvas id="spending-chart"></canvas>
+            </div>
+            <div class="chart-empty hidden" id="chart-empty">
+              <i class="bi bi-pie-chart" style="font-size: 1.5rem; opacity: 0.3;"></i>
+              <p>No transactions this month</p>
+            </div>
           </div>
         </div>
-        <div id="filter-error" class="filter-error hidden"></div>
-      </div>
-    </div>
 
-    <!-- Expenses List -->
-    <div class="card card-expenses">
-      <div class="card-header">
-        <div class="card-header-left">
-          <i class="bi bi-receipt card-icon"></i>
-          <h2 class="card-title">Expenses</h2>
-          <span class="badge" id="expense-count">0</span>
-        </div>
-        <button class="btn-ghost" onclick="seedDemoData()" id="seed-demo-btn" title="Add sample data in multiple months for testing">
-          <i class="bi bi-database-add"></i> Seed Demo Data
-        </button>
-      </div>
-      <div class="card-body card-body-table">
-        <div class="table-responsive">
-          <table class="expense-table" id="expense-table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Amount</th>
-                <th>Category</th>
-                <th>Date</th>
-                <th>Note</th>
-                <th class="th-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="expenses-tbody">
-              <tr>
-                <td colspan="6" class="empty-state">
-                  <div class="skeleton-loader">
-                    <div class="skeleton-line wide"></div>
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line short"></div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Recent Transactions Card -->
+        <div class="card card-dashboard-recent">
+          <div class="card-header">
+            <div class="card-header-left">
+              <i class="bi bi-clock-history card-icon"></i>
+              <h2 class="card-title">Recent Transactions</h2>
+            </div>
+            <button class="btn-ghost" onclick="switchTab('overview')">
+              View All <i class="bi bi-arrow-right"></i>
+            </button>
+          </div>
+          <div class="card-body card-body-table">
+            <div class="table-responsive">
+              <table class="expense-table-mini">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-recent-tbody">
+                  <tr>
+                    <td colspan="4" class="empty-state">No transactions yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Summary & Chart Cards side-by-side -->
-    <div class="summary-chart-row">
-      <!-- Monthly Summary Card -->
-      <div class="card card-summary">
+    <!-- ─── TAB 1: OVERVIEW (Transactions) ─── -->
+    <div id="tab-overview" class="tab-content hidden">
+      <!-- Filters Bar -->
+      <div class="card card-filters" id="filter-card">
         <div class="card-header">
           <div class="card-header-left">
-            <i class="bi bi-bar-chart-line card-icon"></i>
-            <h2 class="card-title">Monthly Summary</h2>
+            <i class="bi bi-funnel card-icon"></i>
+            <h2 class="card-title">Filters</h2>
           </div>
-          <div class="month-nav">
-            <button class="btn-icon" id="prev-month-btn" onclick="changeMonth(-1)" title="Previous month">
-              <i class="bi bi-chevron-left"></i>
-            </button>
-            <span class="month-label" id="month-label">June 2026</span>
-            <button class="btn-icon" id="next-month-btn" onclick="changeMonth(1)" title="Next month">
-              <i class="bi bi-chevron-right"></i>
-            </button>
+          <button class="btn-ghost" onclick="toggleFilters()" id="toggle-filters-btn">
+            <i class="bi bi-chevron-down" id="filter-chevron"></i>
+          </button>
+        </div>
+        <div class="card-body filter-body" id="filter-body">
+          <div class="filter-grid">
+            <div class="filter-item">
+              <label class="form-label-sm" for="filter-category">Category</label>
+              <select id="filter-category" class="form-input-sm">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="filter-item">
+              <label class="form-label-sm" for="filter-from">From</label>
+              <input type="date" id="filter-from" class="form-input-sm" />
+            </div>
+            <div class="filter-item">
+              <label class="form-label-sm" for="filter-to">To</label>
+              <input type="date" id="filter-to" class="form-input-sm" />
+            </div>
+            <div class="filter-item">
+              <label class="form-label-sm" for="filter-search">Search title</label>
+              <div class="input-wrapper-sm">
+                <i class="bi bi-search input-icon-sm"></i>
+                <input type="text" id="filter-search" class="form-input-sm has-icon" placeholder="e.g. coffee" />
+              </div>
+            </div>
+            <div class="filter-actions">
+              <button class="btn-filter-apply" onclick="applyFilters()" id="apply-filters-btn">
+                <i class="bi bi-check2"></i> Apply
+              </button>
+              <button class="btn-filter-clear" onclick="clearFilters()" id="clear-filters-btn">
+                <i class="bi bi-arrow-counterclockwise"></i> Clear
+              </button>
+            </div>
+          </div>
+          <div id="filter-error" class="filter-error hidden"></div>
+        </div>
+      </div>
+
+      <!-- Expenses List -->
+      <div class="card card-expenses">
+        <div class="card-header">
+          <div class="card-header-left">
+            <i class="bi bi-receipt card-icon"></i>
+            <h2 class="card-title">Expenses</h2>
+            <span class="badge" id="expense-count">0</span>
           </div>
         </div>
-        <div class="card-body" id="summary-body">
+        <div class="card-body card-body-table">
+          <div class="table-responsive">
+            <table class="expense-table" id="expense-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Amount</th>
+                  <th>Category</th>
+                  <th>Date</th>
+                  <th>Note</th>
+                  <th class="th-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="expenses-tbody">
+                <tr>
+                  <td colspan="6" class="empty-state">
+                    <div class="skeleton-loader">
+                      <div class="skeleton-line wide"></div>
+                      <div class="skeleton-line"></div>
+                      <div class="skeleton-line short"></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB 2: TRENDS (Analytics) ─── -->
+    <div id="tab-analytics" class="tab-content hidden">
+      <div class="analytics-layout">
+        <!-- Monthly Summary Card -->
+        <div class="card card-summary">
+          <div class="card-header">
+            <div class="card-header-left">
+              <i class="bi bi-bar-chart-line card-icon"></i>
+              <h2 class="card-title">Monthly Summary</h2>
+            </div>
+            <div class="month-nav">
+              <button class="btn-icon" id="prev-month-btn" onclick="changeMonth(-1)" title="Previous month">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+              <span class="month-label" id="month-label">June 2026</span>
+              <button class="btn-icon" id="next-month-btn" onclick="changeMonth(1)" title="Next month">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body" id="summary-body">
+            <div class="skeleton-loader">
+              <div class="skeleton-line wide"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line short"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historical Spending Trend Card -->
+        <div class="card card-trend">
+          <div class="card-header">
+            <div class="card-header-left">
+              <i class="bi bi-graph-up-arrow card-icon"></i>
+              <h2 class="card-title">Historical Spending Trend</h2>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-container" id="trend-chart-container">
+              <canvas id="trend-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB 3: BUDGETS (Limits) ─── -->
+    <div id="tab-budgets" class="tab-content hidden">
+      <div class="card card-budgets">
+        <div class="card-header">
+          <div class="card-header-left">
+            <i class="bi bi-bullseye card-icon"></i>
+            <h2 class="card-title">Monthly Budgets & Limits</h2>
+          </div>
+        </div>
+        <div class="card-body" id="budgets-body">
           <div class="skeleton-loader">
             <div class="skeleton-line wide"></div>
             <div class="skeleton-line"></div>
             <div class="skeleton-line short"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Spending Chart Card -->
-      <div class="card card-chart">
-        <div class="card-header">
-          <div class="card-header-left">
-            <i class="bi bi-pie-chart card-icon"></i>
-            <h2 class="card-title">Spending Breakdown</h2>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="chart-container" id="chart-container">
-            <canvas id="spending-chart"></canvas>
-          </div>
-          <div class="chart-empty hidden" id="chart-empty">
-            <i class="bi bi-pie-chart" style="font-size: 1.5rem; opacity: 0.3;"></i>
-            <p>No data to display</p>
           </div>
         </div>
       </div>

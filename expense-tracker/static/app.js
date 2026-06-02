@@ -8,6 +8,8 @@ let isSubmitting = false; // guard against double-submit
 let hasUnsavedChanges = false; // track dirty form state
 let allExpenses = []; // cached for "filtered vs total" distinction
 let spendingChart = null; // Chart.js instance
+let activeTab = "dashboard"; // active dashboard view
+let trendChart = null; // Chart.js instance for historical trend
 
 // Category icons map
 const CATEGORY_ICONS = {
@@ -45,6 +47,17 @@ document.addEventListener("DOMContentLoaded", () => {
         spendingChart.options.plugins.tooltip.borderColor = isLight ? "#cbd5e1" : "#2a2e3e";
         spendingChart.data.datasets[0].borderColor = isLight ? "#ffffff" : "#1a1d27";
         spendingChart.update();
+      }
+      if (trendChart) {
+        trendChart.options.scales.x.grid.color = isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.05)";
+        trendChart.options.scales.y.grid.color = isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.05)";
+        trendChart.options.scales.x.ticks.color = isLight ? "#64748b" : "#9ca3b4";
+        trendChart.options.scales.y.ticks.color = isLight ? "#64748b" : "#9ca3b4";
+        trendChart.options.plugins.tooltip.backgroundColor = isLight ? "#ffffff" : "#242837";
+        trendChart.options.plugins.tooltip.titleColor = isLight ? "#1e293b" : "#e8eaf0";
+        trendChart.options.plugins.tooltip.bodyColor = isLight ? "#64748b" : "#9ca3b4";
+        trendChart.options.plugins.tooltip.borderColor = isLight ? "#cbd5e1" : "#2a2e3e";
+        trendChart.update();
       }
     });
   }
@@ -99,30 +112,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("filter-category").addEventListener("change", () => loadExpenses());
 
   // Auto-apply date filters on change
-  document.getElementById("filter-from").addEventListener("change", () => {
-    const from = document.getElementById("filter-from").value;
-    const to = document.getElementById("filter-to").value;
-    const errBox = document.getElementById("filter-error");
-    if (from && to && from > to) {
-      errBox.textContent = '"From" date cannot be after "To" date.';
-      errBox.classList.remove("hidden");
-      return;
-    }
-    errBox.classList.add("hidden");
-    loadExpenses();
-  });
-  document.getElementById("filter-to").addEventListener("change", () => {
-    const from = document.getElementById("filter-from").value;
-    const to = document.getElementById("filter-to").value;
-    const errBox = document.getElementById("filter-error");
-    if (from && to && from > to) {
-      errBox.textContent = '"From" date cannot be after "To" date.';
-      errBox.classList.remove("hidden");
-      return;
-    }
-    errBox.classList.add("hidden");
-    loadExpenses();
-  });
+  document.getElementById("filter-from").addEventListener("change", () => loadExpenses());
+  document.getElementById("filter-to").addEventListener("change", () => loadExpenses());
 
   // Header scroll effect
   window.addEventListener("scroll", () => {
@@ -165,6 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Load data
   loadExpenses();
   loadSummary();
+  loadDashRecent();
   updateHeaderTotal();
   updateMonthLabel();
 });
@@ -308,7 +300,11 @@ function frontendValidate(data) {
     if (!firstError) firstError = "category";
   }
 
-  if (!data.date) {
+  const dateEl = document.getElementById("date");
+  if (!dateEl.validity.valid) {
+    showFieldError("date", "Please enter a valid date.");
+    if (!firstError) firstError = "date";
+  } else if (!data.date) {
     showFieldError("date", "Date is required.");
     if (!firstError) firstError = "date";
   } else {
@@ -480,33 +476,6 @@ async function updateHeaderTotal() {
   }
 }
 
-async function seedDemoData() {
-  const btn = document.getElementById("seed-demo-btn");
-  if (!btn) return;
-  btn.disabled = true;
-  const originalText = btn.innerHTML;
-  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Seeding...';
-
-  try {
-    const res = await fetch("/api/expenses/seed", { method: "POST" });
-    if (res.ok) {
-      showToast("Demo data successfully seeded across different months!");
-      loadExpenses();
-      loadSummary();
-      updateHeaderTotal();
-    } else {
-      let json;
-      try { json = await res.json(); } catch { json = {}; }
-      showToast(json.error || "Failed to seed demo data.", "danger");
-    }
-  } catch (err) {
-    showToast("Network error.", "danger");
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalText;
-  }
-}
-
 // ─── Load Expenses ─────────────────────────────────────────────────────────────
 function buildFilterParams() {
   const params = new URLSearchParams();
@@ -522,6 +491,9 @@ function buildFilterParams() {
 }
 
 async function loadExpenses() {
+  if (!validateFilterDates()) {
+    return;
+  }
   const params = buildFilterParams();
   try {
     const res = await fetch("/api/expenses?" + params.toString());
@@ -668,17 +640,41 @@ async function executeDelete(id) {
 }
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
-function applyFilters() {
-  const from = document.getElementById("filter-from").value;
-  const to = document.getElementById("filter-to").value;
+function validateFilterDates() {
+  const fromEl = document.getElementById("filter-from");
+  const toEl = document.getElementById("filter-to");
   const errBox = document.getElementById("filter-error");
+
+  if (!fromEl.validity.valid && !toEl.validity.valid) {
+    errBox.textContent = "Please enter valid 'From' and 'To' dates.";
+    errBox.classList.remove("hidden");
+    return false;
+  }
+  if (!fromEl.validity.valid) {
+    errBox.textContent = "Please enter a valid 'From' date.";
+    errBox.classList.remove("hidden");
+    return false;
+  }
+  if (!toEl.validity.valid) {
+    errBox.textContent = "Please enter a valid 'To' date.";
+    errBox.classList.remove("hidden");
+    return false;
+  }
+
+  const from = fromEl.value;
+  const to = toEl.value;
 
   if (from && to && from > to) {
     errBox.textContent = '"From" date cannot be after "To" date.';
     errBox.classList.remove("hidden");
-    return;
+    return false;
   }
+
   errBox.classList.add("hidden");
+  return true;
+}
+
+function applyFilters() {
   loadExpenses();
 }
 
@@ -704,7 +700,11 @@ function updateMonthLabel() {
     month: "long",
     year: "numeric",
   });
-  document.getElementById("month-label").textContent = label;
+  const lbl1 = document.getElementById("month-label");
+  if (lbl1) lbl1.textContent = label;
+  
+  const lbl2 = document.getElementById("dash-month-label-header");
+  if (lbl2) lbl2.textContent = label;
 }
 
 function changeMonth(delta) {
@@ -719,23 +719,12 @@ function changeMonth(delta) {
   updateMonthLabel();
   loadSummary();
 
-  // Auto-filter the expense table to this newly selected month
-  const firstDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-01`;
-  const lastDayVal = new Date(summaryYear, summaryMonth, 0).getDate();
-  const lastDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-${String(lastDayVal).padStart(2, "0")}`;
-
-  document.getElementById("filter-from").value = firstDay;
-  document.getElementById("filter-to").value = lastDay;
-  document.getElementById("filter-error").classList.add("hidden");
-
-  loadExpenses();
-
-  // Scroll the expenses table automatically back to the top of the viewport
-  const expensesCard = document.querySelector(".card-expenses");
-  if (expensesCard) {
-    setTimeout(() => {
-      expensesCard.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+  if (activeTab === "dashboard") {
+    loadDashRecent();
+  } else if (activeTab === "analytics") {
+    loadTrendChart();
+  } else if (activeTab === "budgets") {
+    loadBudgets();
   }
 }
 
@@ -772,7 +761,7 @@ function renderSummary(data) {
     cats.forEach((cat) => {
       const pct = data.total > 0 ? Math.round((breakdown[cat] / data.total) * 100) : 0;
       html += `
-        <div class="summary-item">
+        <div class="summary-item summary-item-clickable" onclick="filterBySummaryCategory('${cat}')" style="cursor: pointer;" title="Click to view category details in Transactions">
           <span class="category-badge ${catClass(cat)}">
             <i class="bi ${catIcon(cat)}"></i>
             ${escHtml(cat)}
@@ -786,6 +775,81 @@ function renderSummary(data) {
 
   // Update the chart
   renderChart(breakdown);
+
+  // Update dashboard monthly spending total card
+  const dashTotalEl = document.getElementById("dash-month-total");
+  if (dashTotalEl) {
+    dashTotalEl.textContent = fmt(data.total);
+  }
+  const dashMonthLabelEl = document.getElementById("dash-month-label");
+  if (dashMonthLabelEl) {
+    const label = new Date(summaryYear, summaryMonth - 1).toLocaleString("default", {
+      month: "long",
+      year: "numeric",
+    });
+    dashMonthLabelEl.textContent = label;
+  }
+
+  // Update dashboard top category card
+  let topCat = "None";
+  let topCatAmt = 0;
+  for (const [cat, amt] of Object.entries(breakdown)) {
+    if (amt > topCatAmt) {
+      topCatAmt = amt;
+      topCat = cat;
+    }
+  }
+  const dashTopCatEl = document.getElementById("dash-top-category");
+  const dashTopCatAmtEl = document.getElementById("dash-top-category-amount");
+  if (dashTopCatEl && dashTopCatAmtEl) {
+    dashTopCatEl.textContent = topCat;
+    dashTopCatAmtEl.textContent = topCatAmt > 0 ? `${fmt(topCatAmt)} spent` : "₹0.00 spent";
+  }
+
+  // Update dashboard budget health status card
+  let exceededCount = 0;
+  let approachingCount = 0;
+  for (const [cat, limit] of Object.entries(BUDGET_LIMITS)) {
+    const spent = breakdown[cat] || 0;
+    const pct = limit > 0 ? (spent / limit) * 100 : 0;
+    if (pct >= 100) {
+      exceededCount++;
+    } else if (pct >= 70) {
+      approachingCount++;
+    }
+  }
+  
+  const dashBudgetStatusEl = document.getElementById("dash-budget-status");
+  const dashBudgetSubEl = document.getElementById("dash-budget-subtext");
+  const dashBudgetIconWrapEl = document.getElementById("dash-budget-status-icon-wrap");
+  
+  if (dashBudgetStatusEl && dashBudgetSubEl) {
+    if (exceededCount > 0) {
+      dashBudgetStatusEl.textContent = "Exceeded";
+      dashBudgetStatusEl.className = "metric-value text-danger";
+      dashBudgetSubEl.textContent = `${exceededCount} limit${exceededCount > 1 ? 's' : ''} exceeded`;
+      if (dashBudgetIconWrapEl) {
+        dashBudgetIconWrapEl.className = "metric-icon-wrap bg-danger-subtle";
+        dashBudgetIconWrapEl.innerHTML = '<i class="bi bi-shield-x text-danger"></i>';
+      }
+    } else if (approachingCount > 0) {
+      dashBudgetStatusEl.textContent = "Warning";
+      dashBudgetStatusEl.className = "metric-value text-warning";
+      dashBudgetSubEl.textContent = `${approachingCount} limit${approachingCount > 1 ? 's' : ''} near limit`;
+      if (dashBudgetIconWrapEl) {
+        dashBudgetIconWrapEl.className = "metric-icon-wrap bg-warning-subtle";
+        dashBudgetIconWrapEl.innerHTML = '<i class="bi bi-shield-exclamation text-warning"></i>';
+      }
+    } else {
+      dashBudgetStatusEl.textContent = "On Track";
+      dashBudgetStatusEl.className = "metric-value text-success";
+      dashBudgetSubEl.textContent = "All categories within limit";
+      if (dashBudgetIconWrapEl) {
+        dashBudgetIconWrapEl.className = "metric-icon-wrap bg-success-subtle";
+        dashBudgetIconWrapEl.innerHTML = '<i class="bi bi-shield-check text-success"></i>';
+      }
+    }
+  }
 }
 
 // ─── Security ─────────────────────────────────────────────────────────────────
@@ -807,12 +871,12 @@ function escAttr(str) {
 
 // ─── Chart ────────────────────────────────────────────────────────────────────
 const CHART_COLORS = {
-  Food: "#ffd43b",
-  Transport: "#4dabf7",
-  Shopping: "#f783ac",
-  Bills: "#38d9a9",
-  Entertainment: "#da77f2",
-  Other: "#868e96",
+  Food: "#d97706",
+  Transport: "#2563eb",
+  Shopping: "#db2777",
+  Bills: "#059669",
+  Entertainment: "#7c3aed",
+  Other: "#475569",
 };
 
 function renderChart(breakdown) {
@@ -902,5 +966,301 @@ function renderChart(breakdown) {
         },
       },
     });
+  }
+}
+
+// ─── Predefined Budget Limits ─────────────────────────────────────────────────
+const BUDGET_LIMITS = {
+  Food: 15000,
+  Transport: 8000,
+  Shopping: 20000,
+  Bills: 50000,
+  Entertainment: 10000,
+  Other: 10000,
+};
+
+// ─── Dashboard Tabs Switch Logic ──────────────────────────────────────────────
+function switchTab(tabName) {
+  activeTab = tabName;
+  const tabs = ["dashboard", "overview", "analytics", "budgets"];
+  
+  tabs.forEach((t) => {
+    const contentEl = document.getElementById(`tab-${t}`);
+    const btnEl = document.getElementById(`btn-tab-${t}`);
+    
+    if (t === tabName) {
+      contentEl.classList.remove("hidden");
+      btnEl.classList.add("active");
+    } else {
+      contentEl.classList.add("hidden");
+      btnEl.classList.remove("active");
+    }
+  });
+  
+  if (tabName === "dashboard") {
+    loadSummary();
+    loadDashRecent();
+  } else if (tabName === "overview") {
+    const firstDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-01`;
+    const lastDayVal = new Date(summaryYear, summaryMonth, 0).getDate();
+    const lastDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-${String(lastDayVal).padStart(2, "0")}`;
+    document.getElementById("filter-from").value = firstDay;
+    document.getElementById("filter-to").value = lastDay;
+    loadExpenses();
+  } else if (tabName === "analytics") {
+    loadSummary();
+    loadTrendChart();
+  } else if (tabName === "budgets") {
+    loadBudgets();
+  }
+}
+
+// ─── Dashboard Recent Transactions ────────────────────────────────────────────
+async function loadDashRecent() {
+  const firstDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-01`;
+  const lastDayVal = new Date(summaryYear, summaryMonth, 0).getDate();
+  const lastDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-${String(lastDayVal).padStart(2, "0")}`;
+
+  try {
+    const res = await fetch(`/api/expenses?from_date=${firstDay}&to_date=${lastDay}`);
+    if (res.ok) {
+      const json = await res.json();
+      renderDashRecent(json.slice(0, 5));
+    }
+  } catch (err) {
+    console.error("Failed to load dashboard recent transactions:", err);
+  }
+}
+
+function renderDashRecent(expenses) {
+  const tbody = document.getElementById("dash-recent-tbody");
+  if (!tbody) return;
+
+  if (expenses.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="empty-state">No transactions this month</td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = expenses
+    .map(
+      (e) => `
+    <tr>
+      <td class="td-title" title="${escAttr(e.title)}">${escHtml(e.title)}</td>
+      <td class="td-amount">${fmt(e.amount)}</td>
+      <td>
+        <span class="category-badge ${catClass(e.category)}">
+          <i class="bi ${catIcon(e.category)}"></i>
+          ${escHtml(e.category)}
+        </span>
+      </td>
+      <td class="td-date">${formatDate(e.date)}</td>
+    </tr>`
+    )
+    .join("");
+}
+
+// ─── Filter Transactions by Category Clicked in Summary ───────────────────────
+function filterBySummaryCategory(category) {
+  document.getElementById("filter-category").value = category;
+  
+  const firstDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-01`;
+  const lastDayVal = new Date(summaryYear, summaryMonth, 0).getDate();
+  const lastDay = `${summaryYear}-${String(summaryMonth).padStart(2, "0")}-${String(lastDayVal).padStart(2, "0")}`;
+
+  document.getElementById("filter-from").value = firstDay;
+  document.getElementById("filter-to").value = lastDay;
+  document.getElementById("filter-error").classList.add("hidden");
+
+  switchTab("overview");
+
+  const expensesCard = document.querySelector(".card-expenses");
+  if (expensesCard) {
+    setTimeout(() => {
+      expensesCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
+}
+
+// ─── Monthly Trend Chart ──────────────────────────────────────────────────────
+async function loadTrendChart() {
+  const monthsData = [];
+  for (let i = 4; i >= 0; i--) {
+    let m = summaryMonth - i;
+    let y = summaryYear;
+    if (m <= 0) {
+      m += 12;
+      y -= 1;
+    }
+    monthsData.push({ year: y, month: m });
+  }
+
+  try {
+    const requests = monthsData.map((md) =>
+      fetch(`/api/summary/monthly?year=${md.year}&month=${md.month}`).then((res) =>
+        res.ok ? res.json() : { total: 0 }
+      )
+    );
+    const results = await Promise.all(requests);
+    
+    const labels = monthsData.map((md) => {
+      const date = new Date(md.year, md.month - 1);
+      return date.toLocaleString("default", { month: "short" }) + " " + md.year;
+    });
+    
+    const totals = results.map((r) => r.total || 0);
+    renderTrendChart(labels, totals);
+  } catch (err) {
+    console.error("Failed to load trend chart data:", err);
+  }
+}
+
+function renderTrendChart(labels, totals) {
+  const canvas = document.getElementById("trend-chart");
+  if (!canvas) return;
+
+  const isLight = document.body.classList.contains("light");
+
+  if (trendChart) {
+    trendChart.data.labels = labels;
+    trendChart.data.datasets[0].data = totals;
+    trendChart.update();
+  } else {
+    const ctx = canvas.getContext("2d");
+    trendChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Monthly Spending",
+            data: totals,
+            backgroundColor: "rgba(139, 92, 246, 0.6)",
+            borderColor: "#8b5cf6",
+            borderWidth: 2,
+            borderRadius: 6,
+            hoverBackgroundColor: "rgba(139, 92, 246, 0.8)",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+          tooltip: {
+            backgroundColor: isLight ? "#ffffff" : "#242837",
+            titleColor: isLight ? "#1e293b" : "#e8eaf0",
+            bodyColor: isLight ? "#64748b" : "#9ca3b4",
+            borderColor: isLight ? "#cbd5e1" : "#2a2e3e",
+            borderWidth: 1,
+            cornerRadius: 8,
+            padding: 10,
+            titleFont: { family: "'Inter', sans-serif", weight: "600" },
+            bodyFont: { family: "'Inter', sans-serif" },
+            callbacks: {
+              label: function (context) {
+                return ` ₹${Number(context.raw).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              color: isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.05)",
+            },
+            ticks: {
+              color: isLight ? "#64748b" : "#9ca3b4",
+              font: { family: "'Inter', sans-serif", size: 11 },
+            },
+          },
+          y: {
+            grid: {
+              color: isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.05)",
+            },
+            ticks: {
+              color: isLight ? "#64748b" : "#9ca3b4",
+              font: { family: "'Inter', sans-serif", size: 11 },
+              callback: function(value) {
+                if (value >= 1000) {
+                  return "₹" + (value / 1000) + "k";
+                }
+                return "₹" + value;
+              }
+            },
+          },
+        },
+      },
+    });
+  }
+}
+
+// ─── Budget Progress Tracker ──────────────────────────────────────────────────
+async function loadBudgets() {
+  const container = document.getElementById("budgets-body");
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/summary/monthly?year=${summaryYear}&month=${summaryMonth}`);
+    if (!res.ok) {
+      container.innerHTML = `<p class="summary-empty">Failed to load budgets.</p>`;
+      return;
+    }
+    const json = await res.json();
+    const breakdown = json.breakdown || {};
+
+    let html = '<div class="budget-grid">';
+
+    for (const [cat, limit] of Object.entries(BUDGET_LIMITS)) {
+      const spent = breakdown[cat] || 0;
+      const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 200) : 0;
+      const displayPct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+      
+      let statusColor = "green";
+      let statusText = "On Track";
+
+      if (displayPct >= 100) {
+        statusColor = "red";
+        statusText = "Exceeded Limit";
+      } else if (displayPct >= 70) {
+        statusColor = "orange";
+        statusText = "Approaching Limit";
+      }
+
+      html += `
+        <div class="budget-card">
+          <div class="budget-info">
+            <div class="budget-category">
+              <span class="category-badge ${catClass(cat)}">
+                <i class="bi ${catIcon(cat)}"></i>
+                ${escHtml(cat)}
+              </span>
+            </div>
+            <div class="budget-amounts">
+              <span class="budget-spent">${fmt(spent)}</span>
+              <span class="budget-limit">/ ${fmt(limit)}</span>
+            </div>
+          </div>
+          <div class="budget-progress-track">
+            <div class="budget-progress-fill ${statusColor}" style="width: ${Math.min(pct, 100)}%"></div>
+          </div>
+          <div class="budget-status-row">
+            <span class="budget-status-text ${statusColor}">${statusText}</span>
+            <span class="budget-percentage">${displayPct}%</span>
+          </div>
+        </div>
+      `;
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (err) {
+    console.error("Failed to load budgets:", err);
+    container.innerHTML = `<p class="summary-empty">Failed to load budgets.</p>`;
   }
 }

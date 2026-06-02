@@ -12,70 +12,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
-def seed_database_records():
-    samples = [
-        # March 2026
-        {"title": "Apartment Rent", "amount": 15000.00, "category": "Bills", "date": "2026-03-01", "note": "Monthly house rent"},
-        {"title": "Grocery Shopping", "amount": 3450.50, "category": "Food", "date": "2026-03-05", "note": "Reliance Smart Bazar"},
-        {"title": "Netflix Premium", "amount": 649.00, "category": "Entertainment", "date": "2026-03-15", "note": "Monthly streaming subscription"},
-        {"title": "Petrol Refill", "amount": 1200.00, "category": "Transport", "date": "2026-03-22", "note": "Full tank for commuter bike"},
-        {"title": "Nike Pegasus 40", "amount": 7999.00, "category": "Shopping", "date": "2026-03-28", "note": "Bought from official store"},
-        
-        # April 2026
-        {"title": "Apartment Rent", "amount": 15000.00, "category": "Bills", "date": "2026-04-01", "note": "Monthly house rent"},
-        {"title": "Electric Bill", "amount": 2840.00, "category": "Bills", "date": "2026-04-10", "note": "Summer consumption"},
-        {"title": "Uber Hails", "amount": 650.00, "category": "Transport", "date": "2026-04-18", "note": "Office travel during rain"},
-        {"title": "Dining Out (Pizza)", "amount": 1850.00, "category": "Food", "date": "2026-04-22", "note": "Dinner with family"},
-        {"title": "IMAX Movie Ticket", "amount": 950.00, "category": "Entertainment", "date": "2026-04-28", "note": "Avatar re-run"},
-        
-        # May 2026
-        {"title": "Apartment Rent", "amount": 15000.00, "category": "Bills", "date": "2026-05-01", "note": "Monthly house rent"},
-        {"title": "Organic Vegetables", "amount": 1420.00, "category": "Food", "date": "2026-05-06", "note": "Weekly farmers market"},
-        {"title": "Broadband Internet", "amount": 999.00, "category": "Bills", "date": "2026-05-12", "note": "Airtel Xstream Fiber"},
-        {"title": "Train ticket to Delhi", "amount": 2450.00, "category": "Transport", "date": "2026-05-20", "note": "Shatabdi express"},
-        {"title": "Novel Books Purchase", "amount": 1150.00, "category": "Shopping", "date": "2026-05-25", "note": "Fiction & self-help books"},
-        
-        # June 2026
-        {"title": "Apartment Rent", "amount": 15000.00, "category": "Bills", "date": "2026-06-01", "note": "Monthly house rent"},
-        {"title": "Starbucks Coffee", "amount": 350.78, "category": "Food", "date": "2026-06-02", "note": ""},
-        {"title": "PVR Movie Tickets", "amount": 950.00, "category": "Entertainment", "date": "2026-06-03", "note": "Good Movie"},
-        {"title": "Grocery Shopping", "amount": 4200.00, "category": "Food", "date": "2026-06-05", "note": ""},
-        {"title": "Water Utility Bill", "amount": 480.00, "category": "Bills", "date": "2026-06-12", "note": ""},
-        
-        # July 2026
-        {"title": "Apartment Rent", "amount": 15000.00, "category": "Bills", "date": "2026-07-01", "note": "Monthly house rent"},
-        {"title": "Ice Cream Parlour", "amount": 350.00, "category": "Food", "date": "2026-07-04", "note": "Summer special dessert"},
-        {"title": "Gas Utility Bill", "amount": 1100.00, "category": "Bills", "date": "2026-07-08", "note": "Quarterly billing"},
-        {"title": "Mechanical Keyboard", "amount": 4500.00, "category": "Shopping", "date": "2026-07-15", "note": "Keychron V1"},
-        {"title": "Concert Tickets", "amount": 3200.00, "category": "Entertainment", "date": "2026-07-22", "note": "Local indie band festival"},
-    ]
-    
-    seeded_count = 0
-    for s in samples:
-        existing = Expense.query.filter_by(
-            title=s["title"],
-            amount=s["amount"],
-            date=datetime.strptime(s["date"], "%Y-%m-%d").date()
-        ).first()
-        
-        if not existing:
-            expense = Expense(
-                title=s["title"],
-                amount=s["amount"],
-                category=s["category"],
-                date=datetime.strptime(s["date"], "%Y-%m-%d").date(),
-                note=s["note"] or None
-            )
-            db.session.add(expense)
-            seeded_count += 1
-            
-    db.session.commit()
-    return seeded_count
-
 with app.app_context():
     db.create_all()
-    if Expense.query.count() == 0:
-        seed_database_records()
 
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
@@ -206,7 +144,7 @@ def get_expenses():
     if fd and td and fd > td:
         return jsonify({"error": "from_date cannot be after to_date."}), 400
 
-    expenses = query.order_by(Expense.date.desc(), Expense.created_at.desc()).all()
+    expenses = query.order_by(Expense.created_at.desc()).all()
     return jsonify([e.to_dict() for e in expenses])
 
 
@@ -309,10 +247,8 @@ def monthly_summary():
     return jsonify({"year": year, "month": month, "total": total, "breakdown": breakdown})
 
 
-@app.route("/api/expenses/seed", methods=["POST"])
-def seed_expenses():
-    seeded_count = seed_database_records()
-    return jsonify({"message": f"Successfully seeded {seeded_count} sample expenses."}), 201
+
+
 
 
 if __name__ == "__main__":
